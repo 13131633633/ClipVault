@@ -2,7 +2,22 @@
 
 [中文说明](README.md)
 
+![License](https://img.shields.io/github/license/13131633633/ClipVault)
+![Release](https://img.shields.io/github/v/release/13131633633/ClipVault)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Linux%20%7C%20iOS-60A5FA)
+
 ClipVault is a LAN clipboard sync tool for Windows, Linux, Android, and iOS. It syncs clipboard content directly across devices on the same local network, without a cloud server, public IP address, or port forwarding.
+
+In one sentence: ClipVault is an open-source LAN clipboard sync app that automatically syncs copied text and images between Windows and Android system clipboards.
+
+Keywords: clipboard sync, LAN clipboard, cross-device copy, Windows Android clipboard, local network sync, ADB clipboard, QR pairing.
+
+## Download
+
+- [Windows installer EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
+- [Windows portable EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
+- [Android APK](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
+- [All releases](https://github.com/13131633633/ClipVault/releases)
 
 ## Quick Start
 
@@ -18,9 +33,9 @@ ClipVault is a LAN clipboard sync tool for Windows, Linux, Android, and iOS. It 
 
 Release assets:
 
-- Windows installer: `ClipVault Setup 1.0.0.exe`
-- Windows portable executable: `ClipVault.exe`
-- Android debug APK: `ClipVault-Android-debug.apk`
+- Windows installer: [ClipVault-Windows-Setup-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
+- Windows portable executable: [ClipVault-Windows-Portable-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
+- Android APK: [ClipVault-Android-debug-1.0.0.apk](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
 
 ### Option 2: Run the Windows desktop app from source
 

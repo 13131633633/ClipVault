@@ -2,8 +2,23 @@
 
 [English README](README_EN.md)
 
+![License](https://img.shields.io/github/license/13131633633/ClipVault)
+![Release](https://img.shields.io/github/v/release/13131633633/ClipVault)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Linux%20%7C%20iOS-60A5FA)
+
 局域网剪贴板同步工具，支持 Windows / Linux / Android / iOS。  
 核心目标是“复制即同步”，不走公网，不需要端口映射，设备都在同一局域网里就能互通。
+
+一句话：ClipVault 是一个开源的局域网剪贴板同步工具，让 Windows 和 Android 之间复制文本、图片后自动同步到系统剪贴板。
+
+关键词：剪贴板同步、局域网同步、跨设备复制、Windows Android 剪贴板、clipboard sync、LAN clipboard、ADB clipboard。
+
+## 立即下载
+
+- [Windows 安装版 EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
+- [Windows 免安装 EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
+- [Android APK](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
+- [完整 Releases 页面](https://github.com/13131633633/ClipVault/releases)
 
 ## 快速开始
 
@@ -20,8 +35,8 @@
 
 当前仓库里已经打好的 Windows 包位置：
 
-- 安装包：[release/ClipVault Setup 1.0.0.exe](release/ClipVault%20Setup%201.0.0.exe)
-- 免安装版：[release/win-unpacked/ClipVault.exe](release/win-unpacked/ClipVault.exe)
+- 安装包：[ClipVault-Windows-Setup-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
+- 免安装版：[ClipVault-Windows-Portable-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
 
 ### 方式 2：从源码启动 Windows 桌面端
 
@@ -40,7 +55,7 @@ npm run build:desktop
 
 标准 Debug APK 输出路径：
 
-- [android/app/build/outputs/apk/debug/app-debug.apk](android/app/build/outputs/apk/debug/app-debug.apk)
+- [ClipVault-Android-debug-1.0.0.apk](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
 
 重新编译安卓：
 
