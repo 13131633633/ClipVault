@@ -32,6 +32,33 @@ const desktopNotes = [
 const createHashValue = (value) => createHash('sha256').update(value).digest('hex');
 const createPairingSecret = () => String(Math.floor(Math.random() * 1000)).padStart(3, '0');
 
+const normalizeRememberedPairing = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const host = String(value.host ?? '').trim();
+  const port = Number(value.port);
+  const serverId = String(value.serverId ?? '').trim();
+  const token = String(value.token ?? '').trim();
+  const pairingSecret = String(value.pairingSecret ?? '').trim();
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !serverId || (!token && !pairingSecret)) {
+    return null;
+  }
+  return {
+    version: 1,
+    host,
+    port,
+    serverId,
+    serverName: String(value.serverName ?? 'ClipVault 设备'),
+    platform: String(value.platform ?? 'unknown'),
+    token,
+    pairingCode: String(value.pairingCode ?? ''),
+    pairingSecret,
+    issuedAt: Number(value.issuedAt ?? Date.now()),
+    lastConnectedAt: Number(value.lastConnectedAt ?? 0),
+  };
+};
+
 const parseIpv4Parts = (address) => {
   const parts = String(address ?? '').split('.').map((part) => Number(part));
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
@@ -107,6 +134,9 @@ export class DesktopSyncService extends EventEmitter {
     this.server = null;
     this.discoverySocket = null;
     this.peers = new Map();
+    this.rememberedPairings = new Map();
+    this.defaultPairingId = '';
+    this.autoReconnectTimer = null;
     this.interval = null;
     this.lastClipboardSignature = '';
     this.suppressedSignature = '';
@@ -151,6 +181,7 @@ export class DesktopSyncService extends EventEmitter {
       this.emitState();
     }
     this.startClipboardWatcher();
+    this.scheduleAutoReconnect('startup');
     this.emitState();
     return this.getState();
   }
@@ -184,6 +215,13 @@ export class DesktopSyncService extends EventEmitter {
         token: parsed.serverIdentity?.token ?? this.serverIdentity.token,
         pairingCode: parsed.serverIdentity?.pairingCode ?? this.serverIdentity.pairingCode,
       };
+      this.rememberedPairings = new Map(
+        (Array.isArray(parsed.rememberedPairings) ? parsed.rememberedPairings : [])
+          .map(normalizeRememberedPairing)
+          .filter(Boolean)
+          .map((pairing) => [pairing.serverId, pairing]),
+      );
+      this.defaultPairingId = String(parsed.defaultPairingId ?? '');
     } catch {
       await this.persist();
     }
@@ -195,8 +233,62 @@ export class DesktopSyncService extends EventEmitter {
       settings: this.state.settings,
       history: this.state.history.slice(0, this.state.settings.historyLimit),
       serverIdentity: this.serverIdentity,
+      rememberedPairings: [...this.rememberedPairings.values()].sort((left, right) => right.lastConnectedAt - left.lastConnectedAt),
+      defaultPairingId: this.defaultPairingId,
     };
     await fs.writeFile(this.storePath, JSON.stringify(payload, null, 2), 'utf8');
+  }
+
+  rememberPairing(parsed, peerState) {
+    const remembered = normalizeRememberedPairing({
+      ...parsed,
+      serverId: peerState?.id ?? parsed.serverId,
+      serverName: peerState?.name ?? parsed.serverName,
+      platform: peerState?.platform ?? parsed.platform,
+      host: String(peerState?.host ?? `${parsed.host}:${parsed.port}`).split(':')[0] || parsed.host,
+      lastConnectedAt: Date.now(),
+    });
+    if (!remembered) {
+      return;
+    }
+    this.rememberedPairings.set(remembered.serverId, remembered);
+    this.defaultPairingId = remembered.serverId;
+    void this.persist();
+  }
+
+  scheduleAutoReconnect(reason) {
+    if (this.autoReconnectTimer) {
+      clearTimeout(this.autoReconnectTimer);
+    }
+    this.autoReconnectTimer = setTimeout(() => {
+      this.autoReconnectTimer = null;
+      void this.autoReconnectDefaultPairing(reason);
+    }, reason === 'startup' ? 1200 : 6000);
+  }
+
+  async autoReconnectDefaultPairing(reason) {
+    if (this.peers.size > 0 || !this.defaultPairingId) {
+      return;
+    }
+    const remembered = this.rememberedPairings.get(this.defaultPairingId);
+    if (!remembered) {
+      return;
+    }
+    try {
+      this.state.serviceStatus = 'syncing';
+      this.state.statusMessage = `正在自动连接 ${remembered.serverName ?? '上次设备'}`;
+      this.emitState();
+      await this.connectWithParsedPayload(remembered, { fromPairingCode: false, remember: true, quietFailure: true });
+      this.state.statusMessage = `已自动连接 ${remembered.serverName ?? '上次设备'}`;
+      this.emitState();
+    } catch (error) {
+      await this.debugLog(`auto reconnect skipped reason=${reason} target=${remembered.serverId} error=${error.message}`);
+      this.state.serviceStatus = this.peers.size > 0 ? 'online' : 'offline';
+      this.state.statusMessage = `未连接到上次设备，等待对方打开 ClipVault`;
+      this.emitState();
+      await this.persist();
+      this.scheduleAutoReconnect('retry');
+    }
   }
 
   emitState() {
@@ -259,6 +351,7 @@ export class DesktopSyncService extends EventEmitter {
           this.peers.delete(peerState.id);
           this.state.statusMessage = this.peers.size > 0 ? '部分设备已断开' : '等待新设备连接';
           this.emitState();
+          this.scheduleAutoReconnect('peer-closed');
         }
       });
 
@@ -397,6 +490,7 @@ export class DesktopSyncService extends EventEmitter {
       peerState.status = 'online';
       peerState.lastSeen = Date.now();
       this.peers.set(peerState.id, peerState);
+      this.rememberPairing(message.pairingPayload, peerState);
       await this.debugLog(`hello accepted from ${peerState.id} ${peerState.name} ${peerState.host}`);
       this.writeToPeer(peerState, {
         type: 'welcome',
@@ -405,6 +499,7 @@ export class DesktopSyncService extends EventEmitter {
           name: this.state.device.name,
           platform: this.state.device.platform,
         },
+        pairingPayload: this.state.pairingPayload,
         peers: this.state.peers,
       });
       this.state.statusMessage = '设备已连接，实时同步中';
@@ -426,6 +521,7 @@ export class DesktopSyncService extends EventEmitter {
       this.peers.set(peerState.id, peerState);
       this.state.serviceStatus = 'online';
       this.state.statusMessage = '连接已建立';
+      this.rememberPairing(message.pairingPayload, peerState);
       await this.debugLog(`welcome from ${peerState.id} ${peerState.name} ${peerState.host}`);
       this.emitState();
       return;
@@ -615,6 +711,10 @@ export class DesktopSyncService extends EventEmitter {
     const normalizedPayload = String(payload ?? '').trim();
     const fromPairingCode = /^\d{6}$/.test(normalizedPayload);
     const parsed = await this.resolvePairingInput(payload);
+    return this.connectWithParsedPayload(parsed, { fromPairingCode, remember: true });
+  }
+
+  async connectWithParsedPayload(parsed, { fromPairingCode, remember, quietFailure = false }) {
     if (!parsed?.host || !parsed?.port || !parsed?.serverId || (!parsed?.token && !parsed?.pairingSecret)) {
       throw new Error('配对内容无效。');
     }
@@ -631,6 +731,7 @@ export class DesktopSyncService extends EventEmitter {
     this.state.serviceStatus = 'syncing';
     this.state.statusMessage = `正在连接 ${parsed.serverName ?? 'ClipVault 设备'}`;
     this.emitState();
+    let connectedPeerState = null;
 
     await new Promise((resolve, reject) => {
       const socket = new net.Socket();
@@ -657,7 +758,7 @@ export class DesktopSyncService extends EventEmitter {
           this.peers.delete(peerState.id);
           socket.destroy();
           this.state.serviceStatus = this.peers.size > 0 ? 'online' : 'offline';
-          this.state.statusMessage = error.message;
+          this.state.statusMessage = quietFailure ? '未连接到上次设备，等待对方打开 ClipVault' : error.message;
           this.emitState();
           reject(error);
           return;
@@ -686,6 +787,7 @@ export class DesktopSyncService extends EventEmitter {
         if (parsed.pairingSecret) {
           hello.pairingSecret = parsed.pairingSecret;
         }
+        hello.pairingPayload = this.state.pairingPayload;
         this.writeToPeer(peerState, hello);
         this.state.statusMessage = '正在等待设备确认';
         this.emitState();
@@ -695,6 +797,7 @@ export class DesktopSyncService extends EventEmitter {
         for (const message of parseFrames(peerState)) {
           await this.handleSocketMessage(peerState, message);
           if (message.type === 'welcome') {
+            connectedPeerState = peerState;
             finish();
           }
         }
@@ -718,6 +821,9 @@ export class DesktopSyncService extends EventEmitter {
       socket.connect({ host: parsed.host, port: parsed.port });
     });
 
+    if (remember) {
+      this.rememberPairing(parsed, connectedPeerState);
+    }
     await this.persist();
     return this.getState();
   }

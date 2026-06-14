@@ -91,6 +91,32 @@ object ClipVaultRuntime {
         val output: DataOutputStream,
     )
 
+    private data class RememberedPairing(
+        val serverId: String,
+        val serverName: String,
+        val platform: String,
+        val host: String,
+        val port: Int,
+        val token: String,
+        val pairingCode: String,
+        val pairingSecret: String,
+        val lastConnectedAt: Long,
+    ) {
+        fun toJson(): JSONObject =
+            JSONObject().apply {
+                put("version", 1)
+                put("serverId", serverId)
+                put("serverName", serverName)
+                put("platform", platform)
+                put("host", host)
+                put("port", port)
+                put("token", token)
+                put("pairingCode", pairingCode)
+                put("pairingSecret", pairingSecret)
+                put("lastConnectedAt", lastConnectedAt)
+            }
+    }
+
     private lateinit var appContext: Context
     private var initialized = false
     private val executor = Executors.newCachedThreadPool()
@@ -119,9 +145,13 @@ object ClipVaultRuntime {
     )
     private val settingsState = SettingsState()
     private val history = mutableListOf<HistoryEntry>()
+    private val rememberedPairings = ConcurrentHashMap<String, RememberedPairing>()
     private var serviceStatus = "offline"
     private var statusMessage = "等待配对"
     private var advancedAdbStatus = "未启用"
+    private var defaultPairingId = ""
+    @Volatile
+    private var autoReconnectScheduled = false
     private var localAddress = "0.0.0.0"
     private var lastClipboardSignature = ""
     private var suppressedClipboardSignature = ""
@@ -150,6 +180,7 @@ object ClipVaultRuntime {
         initialized = true
         startClipboardPolling()
         startPairingServers()
+        scheduleAutoReconnect("startup")
         notifyState()
     }
 
@@ -388,7 +419,7 @@ object ClipVaultRuntime {
             serviceStatus = "syncing"
             notifyState()
             val parsed = resolvePairingCode(normalized)
-            connectWithResolvedPayload(parsed, true)
+            connectWithResolvedPayload(parsed, true, true)
             return
         }
         val parsed = try {
@@ -396,10 +427,15 @@ object ClipVaultRuntime {
         } catch (exception: Exception) {
             throw IllegalArgumentException("请扫描本软件生成的二维码，或输入 6 位配对码。")
         }
-        connectWithResolvedPayload(parsed, false)
+        connectWithResolvedPayload(parsed, false, true)
     }
 
-    private fun connectWithResolvedPayload(parsed: JSONObject, fromPairingCode: Boolean) {
+    private fun connectWithResolvedPayload(
+        parsed: JSONObject,
+        fromPairingCode: Boolean,
+        remember: Boolean,
+        quietFailure: Boolean = false,
+    ) {
         val host = parsed.getString("host")
         val port = parsed.getInt("port")
         val serverId = parsed.getString("serverId")
@@ -459,6 +495,7 @@ object ClipVaultRuntime {
                             put("role", deviceInfo.role)
                         },
                     )
+                    put("pairingPayload", createPairingPayload())
                 },
             )
 
@@ -472,6 +509,9 @@ object ClipVaultRuntime {
             }
             peer.device.status = "online"
             peer.device.lastSeen = System.currentTimeMillis()
+            if (remember) {
+                rememberPairing(welcome.optJSONObject("pairingPayload") ?: parsed, peer.device)
+            }
             serviceStatus = "online"
             statusMessage = "已连接 $serverName"
             notifyState()
@@ -484,7 +524,9 @@ object ClipVaultRuntime {
             } catch (_: Exception) {
             }
             serviceStatus = if (peers.isEmpty()) "offline" else "online"
-            statusMessage = buildConnectionErrorMessage(exception, fromPairingCode)
+            statusMessage =
+                if (quietFailure) "未连接到上次设备，等待对方打开 ClipVault"
+                else buildConnectionErrorMessage(exception, fromPairingCode)
             notifyState()
             throw IllegalStateException(statusMessage)
         }
@@ -503,6 +545,64 @@ object ClipVaultRuntime {
             put("pairingCode", pairingCode)
             put("pairingSecret", pairingCode.takeLast(3))
             put("issuedAt", System.currentTimeMillis())
+        }
+    }
+
+    private fun rememberPairing(parsed: JSONObject, peer: PeerDevice) {
+        val host = parsed.optString("host", peer.host.substringBefore(':'))
+        val port = parsed.optInt("port", settingsState.serverPort)
+        val pairing = RememberedPairing(
+            serverId = peer.id,
+            serverName = peer.name.ifBlank { parsed.optString("serverName", "ClipVault 设备") },
+            platform = peer.platform.ifBlank { parsed.optString("platform", "unknown") },
+            host = host,
+            port = port,
+            token = parsed.optString("token", ""),
+            pairingCode = parsed.optString("pairingCode", ""),
+            pairingSecret = parsed.optString("pairingSecret", parsed.optString("pairingCode").takeLast(3)),
+            lastConnectedAt = System.currentTimeMillis(),
+        )
+        rememberedPairings[pairing.serverId] = pairing
+        defaultPairingId = pairing.serverId
+        persistState()
+    }
+
+    private fun scheduleAutoReconnect(reason: String) {
+        if (autoReconnectScheduled) {
+            return
+        }
+        autoReconnectScheduled = true
+        executor.execute {
+            try {
+                Thread.sleep(if (reason == "startup") 1200 else 6000)
+                autoReconnectScheduled = false
+                autoReconnectDefaultPairing(reason)
+            } catch (_: Exception) {
+                autoReconnectScheduled = false
+            } finally {
+                autoReconnectScheduled = false
+            }
+        }
+    }
+
+    private fun autoReconnectDefaultPairing(reason: String) {
+        if (peers.isNotEmpty() || defaultPairingId.isBlank()) {
+            return
+        }
+        val remembered = rememberedPairings[defaultPairingId] ?: return
+        try {
+            serviceStatus = "syncing"
+            statusMessage = "正在自动连接 ${remembered.serverName}"
+            notifyState()
+            connectWithResolvedPayload(remembered.toJson(), false, true, true)
+            statusMessage = "已自动连接 ${remembered.serverName}"
+            notifyState()
+        } catch (exception: Exception) {
+            Log.d("ClipVaultRuntime", "auto reconnect skipped reason=$reason target=${remembered.serverId} error=${exception.message}")
+            serviceStatus = if (peers.isEmpty()) "offline" else "online"
+            statusMessage = "未连接到上次设备，等待对方打开 ClipVault"
+            notifyState()
+            scheduleAutoReconnect("retry")
         }
     }
 
@@ -659,6 +759,14 @@ object ClipVaultRuntime {
                     ),
                 )
             }
+            val rememberedArray = parsed.optJSONArray("rememberedPairings") ?: JSONArray()
+            rememberedPairings.clear()
+            for (index in 0 until rememberedArray.length()) {
+                val item = rememberedArray.getJSONObject(index)
+                val pairing = parseRememberedPairing(item) ?: continue
+                rememberedPairings[pairing.serverId] = pairing
+            }
+            defaultPairingId = parsed.optString("defaultPairingId", defaultPairingId)
             trimHistory()
         } catch (_: Exception) {
             history.clear()
@@ -701,10 +809,41 @@ object ClipVaultRuntime {
                             history.forEach { put(it.toJson()) }
                         },
                     )
+                    put(
+                        "rememberedPairings",
+                        JSONArray().apply {
+                            rememberedPairings.values
+                                .sortedByDescending { it.lastConnectedAt }
+                                .forEach { put(it.toJson()) }
+                        },
+                    )
+                    put("defaultPairingId", defaultPairingId)
                 }.toString(2),
             )
         } catch (_: Exception) {
         }
+    }
+
+    private fun parseRememberedPairing(item: JSONObject): RememberedPairing? {
+        val host = item.optString("host", "").trim()
+        val port = item.optInt("port", settingsState.serverPort)
+        val serverId = item.optString("serverId", "").trim()
+        val token = item.optString("token", "").trim()
+        val pairingSecret = item.optString("pairingSecret", "").trim()
+        if (host.isBlank() || serverId.isBlank() || port !in 1..65535 || (token.isBlank() && pairingSecret.isBlank())) {
+            return null
+        }
+        return RememberedPairing(
+            serverId = serverId,
+            serverName = item.optString("serverName", "ClipVault 设备"),
+            platform = item.optString("platform", "unknown"),
+            host = host,
+            port = port,
+            token = token,
+            pairingCode = item.optString("pairingCode", ""),
+            pairingSecret = pairingSecret,
+            lastConnectedAt = item.optLong("lastConnectedAt", 0L),
+        )
     }
 
     private fun notifyState() {
@@ -875,6 +1014,7 @@ object ClipVaultRuntime {
                 }
             } catch (_: Exception) {
                 disconnectPeer(peer.device.id)
+                scheduleAutoReconnect("peer-closed")
             }
         }
     }
@@ -903,6 +1043,7 @@ object ClipVaultRuntime {
                     peers.remove(previousId)
                 }
                 peers[peer.device.id] = peer
+                message.optJSONObject("pairingPayload")?.let { rememberPairing(it, peer.device) }
                 writeFrame(
                     peer.output,
                     JSONObject().apply {
@@ -915,6 +1056,7 @@ object ClipVaultRuntime {
                                 put("platform", deviceInfo.platform)
                             },
                         )
+                        put("pairingPayload", createPairingPayload())
                     },
                 )
                 serviceStatus = "online"
@@ -934,6 +1076,7 @@ object ClipVaultRuntime {
                         peers[peer.device.id] = peer
                     }
                 }
+                message.optJSONObject("pairingPayload")?.let { rememberPairing(it, peer.device) }
                 peer.device.lastSeen = System.currentTimeMillis()
                 peer.device.status = "online"
                 serviceStatus = "online"

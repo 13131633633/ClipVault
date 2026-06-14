@@ -14,17 +14,17 @@ Keywords: clipboard sync, LAN clipboard, cross-device copy, Windows Android clip
 
 ## Download
 
-- [Windows installer EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
-- [Windows portable EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
-- [Android APK](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
-- [All releases](https://github.com/13131633633/ClipVault/releases)
+- [Open Releases and download the latest version](https://github.com/13131633633/ClipVault/releases)
+- Windows users can download `ClipVault-Windows-Setup-*.exe` or `ClipVault-Windows-Portable-*.exe`
+- Android users can download `ClipVault-Android-debug-*.apk`
+- See [CHANGELOG.md](CHANGELOG.md) for release notes
 
 ## Quick Start
 
 ### Option 1: Use the Windows release
 
 1. Open the GitHub Releases page.
-2. Download `ClipVault Setup 1.0.0.exe` for the installer, or `ClipVault.exe` for the portable desktop build.
+2. Download the Windows installer or portable EXE from the Releases page.
 3. Install and start ClipVault on Windows.
 4. Install the Android APK on your phone.
 5. On Windows, open the Connect tab and show the pairing QR code.
@@ -33,9 +33,7 @@ Keywords: clipboard sync, LAN clipboard, cross-device copy, Windows Android clip
 
 Release assets:
 
-- Windows installer: [ClipVault-Windows-Setup-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
-- Windows portable executable: [ClipVault-Windows-Portable-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
-- Android APK: [ClipVault-Android-debug-1.0.0.apk](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
+- [GitHub Releases](https://github.com/13131633633/ClipVault/releases)
 
 ### Option 2: Run the Windows desktop app from source
 

@@ -1,7 +1,7 @@
 {
   "name": "clipvault",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "ClipVault LAN clipboard sync for Windows, Linux, Android, and iOS.",
   "author": "OpenAI Codex",
   "type": "module",
@@ -34,12 +34,18 @@
     "win": {
       "icon": "assets/desktop-icon.ico",
       "target": [
-        "nsis"
-      ]
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "ClipVault-Windows-${version}-${arch}.${ext}"
     },
     "nsis": {
+      "artifactName": "ClipVault-Windows-Setup-${version}.${ext}",
       "installerIcon": "assets/desktop-icon.ico",
       "uninstallerIcon": "assets/desktop-icon.ico"
+    },
+    "portable": {
+      "artifactName": "ClipVault-Windows-Portable-${version}.${ext}"
     },
     "linux": {
       "target": [

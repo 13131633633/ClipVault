@@ -17,10 +17,10 @@
 
 ## 立即下载
 
-- [Windows 安装版 EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
-- [Windows 免安装 EXE](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
-- [Android APK](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
-- [完整 Releases 页面](https://github.com/13131633633/ClipVault/releases)
+- [打开 Releases 下载最新版](https://github.com/13131633633/ClipVault/releases)
+- Windows 用户下载 `ClipVault-Windows-Setup-*.exe` 或 `ClipVault-Windows-Portable-*.exe`
+- Android 用户下载 `ClipVault-Android-debug-*.apk`
+- 更新记录见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 快速开始
 
@@ -28,17 +28,16 @@
 
 ### 方式 1：直接使用 Windows 发布版
 
-1. 打开 Releases 页面，下载 Windows 安装包 `ClipVault Setup *.exe`
+1. 打开 [Releases 页面](https://github.com/13131633633/ClipVault/releases)，下载 Windows 安装包或免安装版
 2. 安装后启动 ClipVault
 3. 在电脑端点击生成配对二维码
 4. 手机端安装安卓 APK 或运行 Android Studio 工程
 5. 手机端点击扫码连接，扫电脑二维码
 6. 如果你希望安卓端在后台也持续读取系统剪贴板，再去开启“高级后台同步”
 
-当前仓库里已经打好的 Windows 包位置：
+当前发布版下载入口：
 
-- 安装包：[ClipVault-Windows-Setup-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Setup-1.0.0.exe)
-- 免安装版：[ClipVault-Windows-Portable-1.0.0.exe](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Windows-Portable-1.0.0.exe)
+- [Releases 页面](https://github.com/13131633633/ClipVault/releases)
 
 ### 方式 2：从源码启动 Windows 桌面端
 
@@ -55,9 +54,9 @@ npm run build:desktop
 
 ### 方式 3：安卓端快速安装
 
-标准 Debug APK 输出路径：
+发布版 APK 下载入口：
 
-- [ClipVault-Android-debug-1.0.0.apk](https://github.com/13131633633/ClipVault/releases/download/v1.0.0/ClipVault-Android-debug-1.0.0.apk)
+- [Releases 页面](https://github.com/13131633633/ClipVault/releases)
 
 重新编译安卓：
 
